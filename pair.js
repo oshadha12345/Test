@@ -14,7 +14,7 @@ import {
     fetchLatestBaileysVersion,
 } from "@whiskeysockets/baileys";
 import pn from "awesome-phonenumber";
-import { upload } from "./mega.js";
+import { upload, download } from "./mongodb.js";
 
 const router = express.Router();
 
