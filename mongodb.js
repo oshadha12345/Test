@@ -4,11 +4,8 @@ import fs from "fs";
 // MongoDB connection URI
 const MONGO_URI = "mongodb+srv://oshiya444_db_user:r0etNWgYHdBiMuQf@cluster0.kehmkje.mongodb.net/?appName=Cluster0";
 
-// connect MongoDB
-mongoose.connect(MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
+// connect MongoDB (FIXED)
+mongoose.connect(MONGO_URI);
 
 mongoose.connection.on("connected", () => {
     console.log("MongoDB connected");
@@ -34,20 +31,17 @@ const Session = mongoose.model("Session", sessionSchema);
 
 
 // ======================================
-// upload function (Mega upload replace)
+// upload function
 // ======================================
 
 export const upload = async (filePath, fileName) => {
 
     try {
 
-        // read file
         const buffer = fs.readFileSync(filePath);
 
-        // remove old session
         await Session.deleteOne({ fileName });
 
-        // save new session
         await Session.create({
             fileName,
             data: buffer
@@ -68,7 +62,7 @@ export const upload = async (filePath, fileName) => {
 
 
 // ======================================
-// download function (Mega download replace)
+// download function
 // ======================================
 
 export const download = async (fileName) => {
