@@ -1,82 +1,98 @@
-import * as mega from "megajs";
+import mongoose from "mongoose";
 import fs from "fs";
 
-// Mega authentication credentials
-const auth = {
-  email: "oshiya444@gmail.com",       
-  password: "oshiya444@gmail.com",    
-    userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246",
+// MongoDB connection URI
+const MONGO_URI = "mongodb+srv://oshiya444_db_user:r0etNWgYHdBiMuQf@cluster0.kehmkje.mongodb.net/?appName=Cluster0";
+
+// connect MongoDB
+mongoose.connect(MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+});
+
+mongoose.connection.on("connected", () => {
+    console.log("MongoDB connected");
+});
+
+mongoose.connection.on("error", (err) => {
+    console.log("MongoDB error:", err);
+});
+
+// schema
+const sessionSchema = new mongoose.Schema({
+    fileName: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    data: Buffer
+}, {
+    timestamps: true
+});
+
+const Session = mongoose.model("Session", sessionSchema);
+
+
+// ======================================
+// upload function (Mega upload replace)
+// ======================================
+
+export const upload = async (filePath, fileName) => {
+
+    try {
+
+        // read file
+        const buffer = fs.readFileSync(filePath);
+
+        // remove old session
+        await Session.deleteOne({ fileName });
+
+        // save new session
+        await Session.create({
+            fileName,
+            data: buffer
+        });
+
+        console.log("Session saved to MongoDB");
+
+        return "mongodb_saved";
+
+    } catch (err) {
+
+        console.log(err);
+        throw err;
+
+    }
+
 };
 
-export const upload = (filePath, fileName) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const storage = new mega.Storage(auth, (err) => {
-                if (err) {
-                    reject(err);
-                    return;
-                }
 
-                const readStream = fs.createReadStream(filePath);
+// ======================================
+// download function (Mega download replace)
+// ======================================
 
-                const uploadStream = storage.upload({
-                    name: fileName,
-                    allowUploadBuffering: true,
-                });
+export const download = async (fileName) => {
 
-                readStream.pipe(uploadStream);
+    try {
 
-                uploadStream.on("complete", (file) => {
-                    file.link((err, url) => {
-                        if (err) {
-                            reject(err);
-                        } else {
-                            storage.close();
-                            resolve(url);
-                        }
-                    });
-                });
+        const session = await Session.findOne({ fileName });
 
-                uploadStream.on("error", (error) => {
-                    reject(error);
-                });
+        if (!session) {
 
-                readStream.on("error", (error) => {
-                    reject(error);
-                });
-            });
+            console.log("No session found in MongoDB");
+            return null;
 
-            storage.on("error", (error) => {
-                reject(error);
-            });
-        } catch (err) {
-            reject(err);
         }
-    });
-};
 
-export const download = (url) => {
-    return new Promise((resolve, reject) => {
-        try {
-            const file = mega.File.fromURL(url);
+        console.log("Session loaded from MongoDB");
 
-            file.loadAttributes((err) => {
-                if (err) {
-                    reject(err);
-                    return;
-                }
+        return session.data;
 
-                file.downloadBuffer((err, buffer) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve(buffer);
-                    }
-                });
-            });
-        } catch (err) {
-            reject(err);
-        }
-    });
+    } catch (err) {
+
+        console.log(err);
+        throw err;
+
+    }
+
 };
