@@ -2,7 +2,7 @@ import express from "express";
 import fs from "fs";
 import pino from "pino";
 import mongoose from "mongoose";
-import Session from "../models/Session.js";
+import Session from "./models/session.js";
 import {
     makeWASocket,
     useMultiFileAuthState,
