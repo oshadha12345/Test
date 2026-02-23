@@ -1,9 +1,6 @@
 import express from "express";
 import fs from "fs";
 import pino from "pino";
-import pkg from "gifted-btns";
-
-const { sendInteractiveMessage } = pkg;
 import {
     makeWASocket,
     useMultiFileAuthState,
@@ -29,7 +26,6 @@ function removeFile(FilePath) {
 
 function getMegaFileId(url) {
     try {
-        // Extract everything after /file/ including the key
         const match = url.match(/\/file\/([^#]+#[^\/]+)/);
         return match ? match[1] : null;
     } catch (error) {
@@ -39,52 +35,46 @@ function getMegaFileId(url) {
 
 router.get("/", async (req, res) => {
     let num = req.query.number;
-    let dirs = "./" + (num || `session`);
+    if (!num) {
+        return res.status(400).send({ code: "Phone number is required" });
+    }
 
+    let dirs = "./" + num;
     await removeFile(dirs);
 
     num = num.replace(/[^0-9]/g, "");
 
     const phone = pn("+" + num);
     if (!phone.isValid()) {
-        if (!res.headersSent) {
-            return res.status(400).send({
-                code: "Invalid phone number. Please enter your full international number (e.g., 15551234567 for US, 447911123456 for UK, 84987654321 for Vietnam, etc.) without + or spaces.",
-            });
-        }
-        return;
+        return res.status(400).send({
+            code: "Invalid phone number. Use full international format without +",
+        });
     }
+
     num = phone.getNumber("e164").replace("+", "");
 
     async function initiateSession() {
         const { state, saveCreds } = await useMultiFileAuthState(dirs);
 
         try {
-            const { version, isLatest } = await fetchLatestBaileysVersion();
-            let KnightBot = makeWASocket({
+            const { version } = await fetchLatestBaileysVersion();
+
+            const KnightBot = makeWASocket({
                 version,
                 auth: {
                     creds: state.creds,
                     keys: makeCacheableSignalKeyStore(
                         state.keys,
-                        pino({ level: "fatal" }).child({ level: "fatal" }),
+                        pino({ level: "fatal" })
                     ),
                 },
                 printQRInTerminal: false,
-                logger: pino({ level: "fatal" }).child({ level: "fatal" }),
+                logger: pino({ level: "fatal" }),
                 browser: Browsers.windows("Chrome"),
-                markOnlineOnConnect: false,
-                generateHighQualityLinkPreview: false,
-                defaultQueryTimeoutMs: 60000,
-                connectTimeoutMs: 60000,
-                keepAliveIntervalMs: 30000,
-                retryRequestDelayMs: 250,
-                maxRetries: 5,
             });
 
             KnightBot.ev.on("connection.update", async (update) => {
-                const { connection, lastDisconnect, isNewLogin, isOnline } =
-                    update;
+                const { connection, lastDisconnect } = update;
 
                 if (connection === "open") {
                     console.log("✅ Connected successfully!");
@@ -92,81 +82,44 @@ router.get("/", async (req, res) => {
 
                     try {
                         const credsPath = dirs + "/creds.json";
+
                         const megaUrl = await upload(
                             credsPath,
-                            `creds_${num}_${Date.now()}.json`,
+                            `creds_${num}_${Date.now()}.json`
                         );
-                        const megaFileIdRaw = getMegaFileId(megaUrl);
-                        const megaFileId = "ᴏꜱʜɪʏᴀ~" + megaFileIdRaw;
+
+                        const megaFileId = getMegaFileId(megaUrl);
 
                         if (megaFileId) {
-                            console.log(
-                                "✅ Session uploaded to MEGA. File ID:",
-                                megaFileId,
+                            console.log("✅ MEGA Upload Success!");
+                            console.log("📁 File ID:", megaFileId);
+
+                            // Save only in server
+                            fs.writeFileSync(
+                                "./mega_sessions.txt",
+                                `Number: ${num} | FileID: ${megaFileId}\n`,
+                                { flag: "a" }
                             );
 
-                            const userJid = jidNormalizedUser(
-                                num + "@s.whatsapp.net",
-                            );
-                            const megaLink = `https://mega.nz/file/${megaFileId}`;
-
-await sendInteractiveMessage(KnightBot, userJid, {
-    text: `╭━━━〔💐𝐎𝐒𝐇𝐈𝐘𝐀💐〕━━━╮
-┃💐 Session uploaded successfully 
-┃
-┃ 📁 ꜱᴇꜱꜱɪᴏɴ ɪᴅ:
-┃ ${megaFileId}
-┃
-┃ ᴄᴏᴘʏ ᴀɴᴅ ᴘᴀꜱᴛᴇ ꜱᴇꜱꜱɪᴏɴ ɪᴅ 💐
-╰━━━━━━━━━━━━━━━━━━╯`,
-
-    footer: "ᴏꜱʜɪʏᴀ-ᴍᴅ 🧑‍💻",
-
-    interactiveButtons: [
-        {
-            name: "cta_copy",
-            buttonParamsJson: JSON.stringify({
-                display_text: "📋 Copy Session ID",
-                copy_code: megaFileId,
-            }),
-        },
-        {
-            name: "cta_url",
-            buttonParamsJson: JSON.stringify({
-                display_text: "🧑‍💻 Oshiya",
-                url: "https://Wa.me/+94756599952?text=_𝐎𝐬𝐡𝐢𝐲𝐚_💐",
-            }),
-        },
-    ],
-});
-                            console.log("📄 MEGA file ID sent successfully");
+                            console.log("💾 Saved to mega_sessions.txt");
                         } else {
-                            console.log("❌ Failed to upload to MEGA");
+                            console.log("❌ Failed to extract MEGA file ID");
                         }
 
                         console.log("🧹 Cleaning up session...");
                         await delay(1000);
                         removeFile(dirs);
-                        console.log("✅ Session cleaned up successfully");
-                        console.log("🎉 Process completed successfully!");
 
-                        console.log("🛑 Shutting down application...");
+                        console.log("🛑 Shutting down...");
                         await delay(2000);
                         process.exit(0);
+
                     } catch (error) {
-                        console.error("❌ Error uploading to MEGA:", error);
+                        console.error("❌ MEGA Upload Error:", error);
                         removeFile(dirs);
                         await delay(2000);
                         process.exit(1);
                     }
-                }
-
-                if (isNewLogin) {
-                    console.log("🔐 New login via pair code");
-                }
-
-                if (isOnline) {
-                    console.log("📶 Client is online");
                 }
 
                 if (connection === "close") {
@@ -174,33 +127,30 @@ await sendInteractiveMessage(KnightBot, userJid, {
                         lastDisconnect?.error?.output?.statusCode;
 
                     if (statusCode === 401) {
-                        console.log(
-                            "❌ Logged out from WhatsApp. Need to generate new pair code.",
-                        );
+                        console.log("❌ Logged out. Need new pairing.");
                     } else {
-                        console.log("🔁 Connection closed — restarting...");
+                        console.log("🔁 Restarting session...");
                         initiateSession();
                     }
                 }
             });
 
             if (!KnightBot.authState.creds.registered) {
-                await delay(3000); // Wait 3 seconds before requesting pairing code
-                num = num.replace(/[^\d+]/g, "");
-                if (num.startsWith("+")) num = num.substring(1);
+                await delay(3000);
 
                 try {
                     let code = await KnightBot.requestPairingCode(num);
                     code = code?.match(/.{1,4}/g)?.join("-") || code;
+
                     if (!res.headersSent) {
-                        console.log({ num, code });
+                        console.log("📲 Pairing Code:", code);
                         await res.send({ code });
                     }
                 } catch (error) {
-                    console.error("Error requesting pairing code:", error);
+                    console.error("Pairing Error:", error);
                     if (!res.headersSent) {
                         res.status(503).send({
-                            code: "Failed to get pairing code. Please check your phone number and try again.",
+                            code: "Failed to get pairing code",
                         });
                     }
                     setTimeout(() => process.exit(1), 2000);
@@ -208,8 +158,9 @@ await sendInteractiveMessage(KnightBot, userJid, {
             }
 
             KnightBot.ev.on("creds.update", saveCreds);
+
         } catch (err) {
-            console.error("Error initializing session:", err);
+            console.error("Session Error:", err);
             if (!res.headersSent) {
                 res.status(503).send({ code: "Service Unavailable" });
             }
@@ -222,23 +173,16 @@ await sendInteractiveMessage(KnightBot, userJid, {
 
 process.on("uncaughtException", (err) => {
     let e = String(err);
-    if (e.includes("conflict")) return;
-    if (e.includes("not-authorized")) return;
-    if (e.includes("Socket connection timeout")) return;
-    if (e.includes("rate-overlimit")) return;
-    if (e.includes("Connection Closed")) return;
-    if (e.includes("Timed Out")) return;
-    if (e.includes("Value not found")) return;
     if (
-        e.includes("Stream Errored") ||
-        e.includes("Stream Errored (restart required)")
+        e.includes("conflict") ||
+        e.includes("not-authorized") ||
+        e.includes("timeout") ||
+        e.includes("rate-overlimit")
     )
         return;
-    if (e.includes("statusCode: 515") || e.includes("statusCode: 503")) return;
-    console.log("Caught exception: ", err);
+
+    console.log("Caught exception:", err);
     process.exit(1);
 });
 
 export default router;
-
-  
