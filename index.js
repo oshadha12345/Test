@@ -3,8 +3,8 @@ import bodyParser from "body-parser";
 import { fileURLToPath } from "url";
 import path from "path";
 import events from "events";
-import session from "express-session";
-import MongoStore from "connect-mongo";
+import session from "express";
+import MongoStore from "mongo";
 import mongoose from "mongoose";
 
 import pairRouter from "./pair.js";
