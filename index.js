@@ -3,8 +3,8 @@ import bodyParser from "body-parser";
 import { fileURLToPath } from "url";
 import path from "path";
 import events from "events";
-import session from "express";
-import MongoStore from "mongo";
+import session from "express-session";
+import MongoStore from "connect-mongo";
 import mongoose from "mongoose";
 
 import pairRouter from "./pair.js";
@@ -18,12 +18,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const PORT = process.env.PORT || 8000;
-const MONGO_URL = process.env.MONGO_URL || "mongodb+srv://oshiya444_db_user:r0etNWgYHdBiMuQf@cluster0.kehmkje.mongodb.net/?appName=Cluster0";
+
+const MONGO_URL =
+  process.env.MONGO_URL ||
+  "mongodb+srv://oshiya444_db_user:r0etNWgYHdBiMuQf@cluster0.kehmkje.mongodb.net/?appName=Cluster0";
 
 // 🔥 MongoDB connect
-mongoose.connect(MONGO_URL)
-.then(() => console.log("MongoDB Connected"))
-.catch(err => console.error(err));
+mongoose
+  .connect(MONGO_URL)
+  .then(() => console.log("✅ MongoDB Connected"))
+  .catch((err) => console.error("MongoDB Error:", err));
 
 // ✅ Session middleware
 app.use(
@@ -33,11 +37,11 @@ app.use(
     saveUninitialized: false,
     store: MongoStore.create({
       mongoUrl: MONGO_URL,
-      collectionName: "sessions"
+      collectionName: "sessions",
     }),
     cookie: {
-      maxAge: 1000 * 60 * 60 * 24 // 1 day
-    }
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
+    },
   })
 );
 
@@ -46,13 +50,13 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname));
 
 app.get("/", (req, res) => {
-    res.sendFile(path.join(__dirname, "pair.html"));
+  res.sendFile(path.join(__dirname, "pair.html"));
 });
 
 app.use("/pair", pairRouter);
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
 
 export default app;
