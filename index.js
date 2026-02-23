@@ -8,7 +8,6 @@ import MongoStore from "connect-mongo";
 import mongoose from "mongoose";
 
 import pairRouter from "./pair.js";
-import qrRouter from "./qr.js";
 
 const app = express();
 
@@ -51,7 +50,6 @@ app.get("/", (req, res) => {
 });
 
 app.use("/pair", pairRouter);
-app.use("/qr", qrRouter);
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
